@@ -1,12 +1,25 @@
 import React, { useRef, useState } from "react";
 import Header from "./Header";
 import { checkValidate } from "../utils/Validate";
+import {
+  getAuth,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
+  updateProfile,
+} from "firebase/auth";
+import { auth } from "../utils/Firebase";
+import { useNavigate } from "react-router-dom";
+import { useDispatch } from "react-redux";
+import { addUser } from "../utils/userSlice";
 
 const SignIn = () => {
   const [newAccount, setNewAccount] = useState(false);
   const [errorMessage, setErrorMessage] = useState(null);
+  const navigate = useNavigate();
   const email = useRef(null);
   const password = useRef(null);
+  const name = useRef(null);
+  const dispatch = useDispatch();
 
   const handleSignUp = () => {
     setNewAccount(!newAccount);
@@ -16,6 +29,71 @@ const SignIn = () => {
     const message = checkValidate(email.current.value, password.current.value);
     if (message) {
       setErrorMessage(message);
+      return;
+    }
+
+    if (newAccount) {
+      //signUp
+      createUserWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          // Signed up
+          const user = userCredential.user;
+          console.log(user);
+
+          updateProfile(user, {
+            displayName: name.current.value,
+            photoURL: "https://example.com/jane-q-user/profile.jpg",
+          })
+            .then(() => {
+              // Profile updated!
+              // ...
+              const { uid, email, displayName } = auth;
+              dispatch(
+                addUser({
+                  uid: uid,
+                  email: email,
+                  displayName: displayName,
+                })
+              );
+              navigate("/browse");
+            })
+            .catch((error) => {
+              // An error occurred
+              // ...
+              setErrorMessage(error);
+            });
+          navigate("/browse");
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + errorMessage);
+          // ..
+        });
+    } else {
+      //signIN
+      signInWithEmailAndPassword(
+        auth,
+        email.current.value,
+        password.current.value
+      )
+        .then((userCredential) => {
+          // Signed in
+          const user = userCredential.user;
+          console.log(user);
+          navigate("/browse");
+          // ...
+        })
+        .catch((error) => {
+          const errorCode = error.code;
+          const errorMessage = error.message;
+          setErrorMessage(errorCode + errorMessage);
+        });
     }
   };
 
@@ -52,6 +130,7 @@ const SignIn = () => {
         />
         {newAccount && (
           <input
+            ref={name}
             type="text"
             placeholder="Name"
             className="p-3 m-4 bg-gray-700"
@@ -63,14 +142,12 @@ const SignIn = () => {
           placeholder="Password"
           className="p-3 m-4 bg-gray-700"
         />
-        {errorMessage && (
-          <p className="p-2 m-1 text-red-600">{errorMessage}</p>
-        )}
+        {errorMessage && <p className="p-2 m-1 text-red-600">{errorMessage}</p>}
         <button
           className="bg-red-600 text-white p-2 m-4"
           onClick={handleButtonClick}
         >
-          {!newAccount ? "Sign Up" : "Sign In"}
+          {!newAccount ? "Sign In" : "Sign Up"}
         </button>
         {!newAccount ? (
           <p
